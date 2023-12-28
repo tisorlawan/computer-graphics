@@ -1,18 +1,46 @@
 use std::io::{BufWriter, Write};
 use std::{fs::File, io, ops, path::Path};
 
+use light::Light;
 use shape::{Shape, Sphere};
 
+pub mod light;
 pub mod shape;
 
-const BG_COLOR: Color = Color(30, 30, 30);
+pub const BLACK: Color = Color(0, 0, 0);
+pub const WHITE: Color = Color(255, 255, 255);
+pub const RED: Color = Color(255, 0, 0);
+pub const GREEN: Color = Color(0, 255, 0);
+pub const BLUE: Color = Color(0, 0, 255);
+pub const MAGENTA: Color = Color(255, 0, 255);
+pub const CYAN: Color = Color(0, 255, 255);
+pub const YELLOW: Color = Color(255, 255, 0);
 
-pub const RED: Color = Color(210, 50, 50);
-pub const GREEN: Color = Color(50, 210, 50);
-pub const BLUE: Color = Color(50, 50, 210);
-pub const MAGENTA: Color = Color(210, 50, 210);
-pub const CYAN: Color = Color(50, 210, 210);
-pub const YELLOW: Color = Color(210, 210, 50);
+const BG_COLOR: Color = WHITE;
+
+#[derive(Debug, Clone, Copy)]
+pub struct Vector(pub f64, pub f64, pub f64);
+
+impl Vector {
+    pub fn dot(&self, other: Vector) -> f64 {
+        self.0 * other.0 + self.1 * other.1 + self.2 * other.2
+    }
+
+    pub fn length(&self) -> f64 {
+        self.dot(*self).sqrt()
+    }
+
+    pub fn unit(&self) -> Vector {
+        let length = self.length();
+        Vector(self.0 / length, self.1 / length, self.2 / length)
+    }
+}
+
+impl From<Point> for Vector {
+    fn from(value: Point) -> Self {
+        Vector(value.0, value.1, value.2)
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Point(pub f64, pub f64, pub f64);
@@ -63,17 +91,19 @@ impl ops::Add for Point {
 pub struct Color(pub u8, pub u8, pub u8);
 
 impl Color {
-    pub fn intensify(&mut self, factor: f64) {
-        let r = self.0 as f64 * factor as f64;
+    pub fn intensify(&mut self, factor: f64) -> Color {
+        let mut c = self.clone();
+        let r = c.0 as f64 * factor as f64;
         let r: u8 = if r > 255.0 { 255 } else { r.floor() as u8 };
-        let g = self.1 as f64 * factor as f64;
+        let g = c.1 as f64 * factor as f64;
         let g: u8 = if g > 255.0 { 255 } else { g.floor() as u8 };
-        let b = self.2 as f64 * factor as f64;
+        let b = c.2 as f64 * factor as f64;
         let b: u8 = if b > 255.0 { 255 } else { b.floor() as u8 };
 
-        self.0 = r;
-        self.1 = g;
-        self.2 = b;
+        c.0 = r;
+        c.1 = g;
+        c.2 = b;
+        c
     }
 }
 
@@ -163,6 +193,32 @@ impl Default for Viewport {
     }
 }
 
+// n: normal surface, unit vector, perpendicular to surface at P
+fn compute_lighting(p: Point, n: Vector, lights: &[Light]) -> f64 {
+    let mut i = 0.0;
+
+    for light in lights {
+        match light {
+            Light::Ambient(intensity) => i += intensity,
+            _ => {
+                let (l, intensity) = if let Light::Point(intensity, poisition) = light {
+                    ((*poisition - p).into(), *intensity)
+                } else if let Light::Directional(intensity, direction) = light {
+                    (*direction, *intensity)
+                } else {
+                    unreachable!()
+                };
+
+                let n_dot_l = n.dot(l);
+                if n_dot_l > 0.0 {
+                    i += intensity * n_dot_l / (n.length() * l.length());
+                }
+            }
+        }
+    }
+    i
+}
+
 pub struct Raytracer {
     camera: Point,
     vw: Viewport,
@@ -178,11 +234,11 @@ impl Raytracer {
         }
     }
 
-    pub fn fill_canvas(&mut self, scenes: Vec<Sphere>) {
+    pub fn fill_canvas(&mut self, scenes: Vec<Sphere>, lights: &[Light]) {
         for y in -(self.canvas.h as i32) / 2..(self.canvas.h as i32 / 2) {
             for x in -(self.canvas.w as i32) / 2..(self.canvas.w as i32 / 2) {
                 let vp_point = self.viewport_point_from_canvas_point(x as f64, y as f64);
-                let color = self.trace_ray(vp_point, &scenes, 1.0, 100.0);
+                let color = self.trace_ray(vp_point, &scenes, lights, 1.0, 100.0);
                 self.canvas.put_pixel(x, y, color);
             }
         }
@@ -192,6 +248,7 @@ impl Raytracer {
         &self,
         viewport_point: Point,
         scenes: &[Sphere],
+        lights: &[Light],
         t_min: f64,
         t_max: f64,
     ) -> Color {
@@ -200,7 +257,7 @@ impl Raytracer {
 
         let d = viewport_point - self.camera;
         for shape in scenes {
-            if let Some((t1, t2)) = shape.intersect_ray(self.camera, d) {
+            if let Some((t1, t2)) = shape.intersect_ray(self.camera, d.into()) {
                 if t_min <= t1 && t1 <= t_max && t1 < closest_t {
                     closest_t = t1;
                     closest_sphere = Some(shape);
@@ -215,7 +272,12 @@ impl Raytracer {
 
         match closest_sphere {
             None => BG_COLOR,
-            Some(sphere) => sphere.color(),
+            Some(sphere) => {
+                let p = self.camera + d.scale(closest_t);
+                sphere
+                    .color()
+                    .intensify(compute_lighting(p, sphere.normal(p), lights))
+            }
         }
     }
 

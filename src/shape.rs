@@ -1,7 +1,8 @@
-use crate::{Color, Point};
+use crate::{Color, Point, Vector};
 
 pub trait Shape {
-    fn intersect_ray(&self, camera: Point, ray_direction: Point) -> Option<(f64, f64)>;
+    fn intersect_ray(&self, camera: Point, ray_direction: Vector) -> Option<(f64, f64)>;
+    fn normal(&self, p: Point) -> Vector;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -22,13 +23,13 @@ impl Sphere {
 }
 
 impl Shape for Sphere {
-    fn intersect_ray(&self, camera: Point, ray_direction: Point) -> Option<(f64, f64)> {
+    fn intersect_ray(&self, camera: Point, ray_direction: Vector) -> Option<(f64, f64)> {
         let d = ray_direction;
         let o = camera;
         let co = o - self.c;
 
         let a = d.dot(d);
-        let b = 2.0 * d.dot(co);
+        let b = 2.0 * d.dot(co.into());
         let c = co.dot(co) - self.r.powi(2);
 
         let discriminant = b.powi(2) - 4.0 * a * c;
@@ -39,5 +40,10 @@ impl Shape for Sphere {
         let t1 = (-b + discriminant.sqrt()) / (2.0 * a);
         let t2 = (-b - discriminant.sqrt()) / (2.0 * a);
         Some((t1, t2))
+    }
+
+    fn normal(&self, p: Point) -> Vector {
+        let cp: Vector = (p - self.c).into();
+        cp.unit()
     }
 }
