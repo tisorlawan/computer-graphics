@@ -5,11 +5,14 @@ use shape::{Shape, Sphere};
 
 pub mod shape;
 
-const BG_COLOR: Color = Color(20, 20, 20);
+const BG_COLOR: Color = Color(30, 30, 30);
 
-pub const RED: Color = Color(190, 60, 60);
-pub const GREEN: Color = Color(60, 190, 60);
-pub const BLUE: Color = Color(60, 60, 190);
+pub const RED: Color = Color(210, 50, 50);
+pub const GREEN: Color = Color(50, 210, 50);
+pub const BLUE: Color = Color(50, 50, 210);
+pub const MAGENTA: Color = Color(210, 50, 210);
+pub const CYAN: Color = Color(50, 210, 210);
+pub const YELLOW: Color = Color(210, 210, 50);
 
 #[derive(Debug, Clone, Copy)]
 pub struct Point(pub f64, pub f64, pub f64);
