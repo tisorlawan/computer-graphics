@@ -1,16 +1,22 @@
 use computer_graphics::{
-    light::Light, shape::Sphere, Canvas, Point, Raytracer, Vector, Viewport, BLUE, GREEN, RED,
-    YELLOW,
+    color, light::Light, shape::Sphere, Canvas, Point, Raytracer, Vector, Viewport,
 };
 
 fn raytracer_spheres_example() {
-    let mut raytracer = Raytracer::new(Point::origin(), Viewport::default(), Canvas::new(600, 600));
+    const CANVAS_WIDTH: usize = 600;
+    const CANVAS_HEIGHT: usize = 600;
+
+    let mut raytracer = Raytracer::new(
+        Point::origin(),
+        Viewport::default(),
+        Canvas::new(CANVAS_WIDTH, CANVAS_HEIGHT),
+    );
 
     let shapes = vec![
-        Sphere::new(Point(0.0, -1.0, 3.0), 1.0, RED),
-        Sphere::new(Point(2.0, 0.0, 4.0), 1.0, BLUE),
-        Sphere::new(Point(-2.0, 0.0, 4.0), 1.0, GREEN),
-        Sphere::new(Point(0.0, -5001.0, 0.0), 5000.0, YELLOW),
+        Sphere::new(Point(0.0, -1.0, 3.0), 1.0, color::RED),
+        Sphere::new(Point(2.0, 0.0, 4.0), 1.0, color::BLUE),
+        Sphere::new(Point(-2.0, 0.0, 4.0), 1.0, color::GREEN),
+        Sphere::new(Point(0.0, -5001.0, 0.0), 5000.0, color::YELLOW),
     ];
 
     let lights = vec![

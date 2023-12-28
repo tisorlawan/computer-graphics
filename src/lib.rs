@@ -7,16 +7,52 @@ use shape::{Shape, Sphere};
 pub mod light;
 pub mod shape;
 
-pub const BLACK: Color = Color(0, 0, 0);
-pub const WHITE: Color = Color(255, 255, 255);
-pub const RED: Color = Color(255, 0, 0);
-pub const GREEN: Color = Color(0, 255, 0);
-pub const BLUE: Color = Color(0, 0, 255);
-pub const MAGENTA: Color = Color(255, 0, 255);
-pub const CYAN: Color = Color(0, 255, 255);
-pub const YELLOW: Color = Color(255, 255, 0);
+pub mod color {
+    use std::ops;
 
-const BG_COLOR: Color = WHITE;
+    pub const BLACK: Color = Color(0, 0, 0);
+    pub const WHITE: Color = Color(255, 255, 255);
+    pub const RED: Color = Color(255, 0, 0);
+    pub const GREEN: Color = Color(0, 255, 0);
+    pub const BLUE: Color = Color(0, 0, 255);
+    pub const MAGENTA: Color = Color(255, 0, 255);
+    pub const CYAN: Color = Color(0, 255, 255);
+    pub const YELLOW: Color = Color(255, 255, 0);
+
+    pub const BG_COLOR: Color = WHITE;
+
+    #[derive(Debug, Clone, Copy)]
+    pub struct Color(pub u8, pub u8, pub u8);
+
+    impl Color {
+        pub fn scale(&mut self, factor: f64) -> Color {
+            let mut c = self.clone();
+            let r = c.0 as f64 * factor as f64;
+            let r: u8 = if r > 255.0 { 255 } else { r.floor() as u8 };
+            let g = c.1 as f64 * factor as f64;
+            let g: u8 = if g > 255.0 { 255 } else { g.floor() as u8 };
+            let b = c.2 as f64 * factor as f64;
+            let b: u8 = if b > 255.0 { 255 } else { b.floor() as u8 };
+
+            c.0 = r;
+            c.1 = g;
+            c.2 = b;
+            c
+        }
+    }
+
+    impl ops::Add for Color {
+        type Output = Self;
+
+        fn add(self, rhs: Self) -> Self::Output {
+            Self(
+                self.0.saturating_add(rhs.0),
+                self.1.saturating_add(rhs.1),
+                self.2.saturating_add(rhs.2),
+            )
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Vector(pub f64, pub f64, pub f64);
@@ -87,43 +123,11 @@ impl ops::Add for Point {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Color(pub u8, pub u8, pub u8);
-
-impl Color {
-    pub fn intensify(&mut self, factor: f64) -> Color {
-        let mut c = self.clone();
-        let r = c.0 as f64 * factor as f64;
-        let r: u8 = if r > 255.0 { 255 } else { r.floor() as u8 };
-        let g = c.1 as f64 * factor as f64;
-        let g: u8 = if g > 255.0 { 255 } else { g.floor() as u8 };
-        let b = c.2 as f64 * factor as f64;
-        let b: u8 = if b > 255.0 { 255 } else { b.floor() as u8 };
-
-        c.0 = r;
-        c.1 = g;
-        c.2 = b;
-        c
-    }
-}
-
-impl ops::Add for Color {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self(
-            self.0.saturating_add(rhs.0),
-            self.1.saturating_add(rhs.1),
-            self.2.saturating_add(rhs.2),
-        )
-    }
-}
-
 /// Canvas: the abstract rectangular surface on which we can color pixels (draw on).
 pub struct Canvas {
     w: usize,
     h: usize,
-    pixels: Vec<Color>,
+    pixels: Vec<color::Color>,
 }
 
 impl Canvas {
@@ -131,13 +135,13 @@ impl Canvas {
         let canvas = Self {
             w,
             h,
-            pixels: std::iter::repeat(BG_COLOR).take(w * h).collect(),
+            pixels: std::iter::repeat(color::BG_COLOR).take(w * h).collect(),
         };
         canvas
     }
 
     // Convert canvas coordinate system to computer screen coordinate
-    pub fn put_pixel(&mut self, x: i32, y: i32, color: Color) {
+    pub fn put_pixel(&mut self, x: i32, y: i32, color: color::Color) {
         let (sx, sy) = self.canvas_to_screen_coordinate(x, y);
 
         let i = sy as usize * self.w + sx as usize;
@@ -148,7 +152,7 @@ impl Canvas {
 
     pub fn clear(&mut self) {
         for pixel in self.pixels.iter_mut() {
-            *pixel = BG_COLOR;
+            *pixel = color::BG_COLOR;
         }
     }
 
@@ -201,10 +205,10 @@ fn compute_lighting(p: Point, n: Vector, lights: &[Light]) -> f64 {
         match light {
             Light::Ambient(intensity) => i += intensity,
             _ => {
-                let (l, intensity) = if let Light::Point(intensity, poisition) = light {
-                    ((*poisition - p).into(), *intensity)
-                } else if let Light::Directional(intensity, direction) = light {
-                    (*direction, *intensity)
+                let (l, intensity) = if let Light::Point(intensity, poisition) = *light {
+                    ((poisition - p).into(), intensity)
+                } else if let Light::Directional(intensity, direction) = *light {
+                    (direction, intensity)
                 } else {
                     unreachable!()
                 };
@@ -251,7 +255,7 @@ impl Raytracer {
         lights: &[Light],
         t_min: f64,
         t_max: f64,
-    ) -> Color {
+    ) -> color::Color {
         let mut closest_t = f64::MAX - 1.0;
         let mut closest_sphere: Option<&Sphere> = None;
 
@@ -271,12 +275,12 @@ impl Raytracer {
         }
 
         match closest_sphere {
-            None => BG_COLOR,
+            None => color::BG_COLOR,
             Some(sphere) => {
-                let p = self.camera + d.scale(closest_t);
+                let p = self.ray_at(viewport_point, closest_t);
                 sphere
                     .color()
-                    .intensify(compute_lighting(p, sphere.normal(p), lights))
+                    .scale(compute_lighting(p, sphere.normal(p), lights))
             }
         }
     }
