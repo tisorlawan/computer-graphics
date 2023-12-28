@@ -7,6 +7,8 @@ use shape::{Shape, Sphere};
 pub mod light;
 pub mod shape;
 
+type Direction = Vector;
+
 pub mod color {
     use std::ops;
 
@@ -62,6 +64,10 @@ impl Vector {
         self.0 * other.0 + self.1 * other.1 + self.2 * other.2
     }
 
+    pub fn cos(&self, other: Vector) -> f64 {
+        self.dot(other) / (self.length() * other.length())
+    }
+
     pub fn length(&self) -> f64 {
         self.dot(*self).sqrt()
     }
@@ -70,11 +76,27 @@ impl Vector {
         let length = self.length();
         Vector(self.0 / length, self.1 / length, self.2 / length)
     }
+
+    pub fn scale(&self, factor: f64) -> Vector {
+        Vector(self.0 * factor, self.1 * factor, self.2 * factor)
+    }
+
+    pub fn mul(&self, o: Vector) -> Vector {
+        Vector(self.0 * o.0, self.1 * 0.1, self.2 * 0.2)
+    }
 }
 
 impl From<Point> for Vector {
     fn from(value: Point) -> Self {
         Vector(value.0, value.1, value.2)
+    }
+}
+
+impl ops::Sub for Vector {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        Vector(self.0 - rhs.0, self.1 - rhs.1, self.2 - rhs.2)
     }
 }
 
@@ -198,7 +220,8 @@ impl Default for Viewport {
 }
 
 // n: normal surface, unit vector, perpendicular to surface at P
-fn compute_lighting(p: Point, n: Vector, lights: &[Light]) -> f64 {
+// s: specular exponent, -1.0 for non specular
+fn compute_lighting(p: Point, n: Vector, v: Direction, lights: &[Light], s: f64) -> f64 {
     let mut i = 0.0;
 
     for light in lights {
@@ -213,9 +236,19 @@ fn compute_lighting(p: Point, n: Vector, lights: &[Light]) -> f64 {
                     unreachable!()
                 };
 
+                // diffuse
                 let n_dot_l = n.dot(l);
                 if n_dot_l > 0.0 {
                     i += intensity * n_dot_l / (n.length() * l.length());
+                }
+
+                // specular
+                if s != -1.0 {
+                    let r = n.scale(2.0).scale(n_dot_l) - l;
+                    let r_cos_v = r.cos(v);
+                    if r_cos_v > 0.0 {
+                        i += intensity * r_cos_v.powf(s);
+                    }
                 }
             }
         }
@@ -278,9 +311,13 @@ impl Raytracer {
             None => color::BG_COLOR,
             Some(sphere) => {
                 let p = self.ray_at(viewport_point, closest_t);
-                sphere
-                    .color()
-                    .scale(compute_lighting(p, sphere.normal(p), lights))
+                sphere.color().scale(compute_lighting(
+                    p,
+                    sphere.normal(p),
+                    d.scale(-1.0).into(),
+                    lights,
+                    sphere.specular,
+                ))
             }
         }
     }

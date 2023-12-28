@@ -13,10 +13,10 @@ fn raytracer_spheres_example() {
     );
 
     let shapes = vec![
-        Sphere::new(Point(0.0, -1.0, 3.0), 1.0, color::RED),
-        Sphere::new(Point(2.0, 0.0, 4.0), 1.0, color::BLUE),
-        Sphere::new(Point(-2.0, 0.0, 4.0), 1.0, color::GREEN),
-        Sphere::new(Point(0.0, -5001.0, 0.0), 5000.0, color::YELLOW),
+        Sphere::new(Point(0.0, -1.0, 3.0), 1.0, color::RED, 500.0),
+        Sphere::new(Point(2.0, 0.0, 4.0), 1.0, color::BLUE, 500.0),
+        Sphere::new(Point(-2.0, 0.0, 4.0), 1.0, color::GREEN, 10.0),
+        Sphere::new(Point(0.0, -5001.0, 0.0), 5000.0, color::YELLOW, 1000.0),
     ];
 
     let lights = vec![

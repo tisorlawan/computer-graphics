@@ -1,7 +1,6 @@
-use crate::{Point, Vector};
+use crate::{Direction, Point};
 
 type Intensity = f64;
-type Direction = Vector;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Light {
