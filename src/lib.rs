@@ -7,6 +7,10 @@ pub mod shape;
 
 const BG_COLOR: Color = Color(20, 20, 20);
 
+pub const RED: Color = Color(190, 60, 60);
+pub const GREEN: Color = Color(60, 190, 60);
+pub const BLUE: Color = Color(60, 60, 190);
+
 #[derive(Debug, Clone, Copy)]
 pub struct Point(pub f64, pub f64, pub f64);
 
