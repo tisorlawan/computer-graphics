@@ -2,4 +2,4 @@
 
 ## References
 
-- THE BOOK, [Computer Graphics from Scratch](https://gabrielgambetta.com/computer-graphics-from-scratch/)
+- THE BOOK, [Computer Graphics from Scratch](https://gabrielgambetta.com/computer-graphics-from-scratch/) by Gabriel Gambetta.
