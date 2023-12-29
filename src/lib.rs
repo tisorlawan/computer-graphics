@@ -219,22 +219,62 @@ impl Default for Viewport {
     }
 }
 
+pub fn closest_intersection<'a>(
+    start_point: Point,
+    direction_vector: Direction,
+    scenes: &'a [Sphere],
+    t_min: f64,
+    t_max: f64,
+) -> Option<(f64, &'a Sphere)> {
+    let mut closest_t = f64::MAX - 1.0;
+    let mut closest_sphere: Option<&Sphere> = None;
+
+    for shape in scenes {
+        if let Some((t1, t2)) = shape.intersect_ray(start_point, direction_vector) {
+            if t_min <= t1 && t1 <= t_max && t1 < closest_t {
+                closest_t = t1;
+                closest_sphere = Some(shape);
+            }
+
+            if t_min <= t2 && t2 <= t_max && t2 < closest_t {
+                closest_t = t2;
+                closest_sphere = Some(shape);
+            }
+        }
+    }
+
+    closest_sphere.map(|e| (closest_t, e))
+}
+
 // n: normal surface, unit vector, perpendicular to surface at P
 // s: specular exponent, -1.0 for non specular
-fn compute_lighting(p: Point, n: Vector, v: Direction, lights: &[Light], s: f64) -> f64 {
+fn compute_lighting(
+    p: Point,
+    n: Vector,
+    v: Direction,
+    lights: &[Light],
+    s: f64,
+    scenes: &[Sphere],
+) -> f64 {
     let mut i = 0.0;
 
     for light in lights {
         match light {
             Light::Ambient(intensity) => i += intensity,
             _ => {
+                let mut t_max = 1.0;
                 let (l, intensity) = if let Light::Point(intensity, poisition) = *light {
                     ((poisition - p).into(), intensity)
                 } else if let Light::Directional(intensity, direction) = *light {
+                    t_max = f64::MAX;
                     (direction, intensity)
                 } else {
                     unreachable!()
                 };
+
+                if closest_intersection(p, l, scenes, 0.0001, t_max).is_some() {
+                    continue;
+                }
 
                 // diffuse
                 let n_dot_l = n.dot(l);
@@ -289,34 +329,21 @@ impl Raytracer {
         t_min: f64,
         t_max: f64,
     ) -> color::Color {
-        let mut closest_t = f64::MAX - 1.0;
-        let mut closest_sphere: Option<&Sphere> = None;
+        let direction = viewport_point - self.camera;
+        let intersection =
+            closest_intersection(self.camera, direction.into(), scenes, t_min, t_max);
 
-        let d = viewport_point - self.camera;
-        for shape in scenes {
-            if let Some((t1, t2)) = shape.intersect_ray(self.camera, d.into()) {
-                if t_min <= t1 && t1 <= t_max && t1 < closest_t {
-                    closest_t = t1;
-                    closest_sphere = Some(shape);
-                }
-
-                if t_min <= t2 && t2 <= t_max && t2 < closest_t {
-                    closest_t = t2;
-                    closest_sphere = Some(shape);
-                }
-            }
-        }
-
-        match closest_sphere {
+        match intersection {
             None => color::BG_COLOR,
-            Some(sphere) => {
+            Some((closest_t, sphere)) => {
                 let p = self.ray_at(viewport_point, closest_t);
                 sphere.color().scale(compute_lighting(
                     p,
                     sphere.normal(p),
-                    d.scale(-1.0).into(),
+                    direction.scale(-1.0).into(),
                     lights,
                     sphere.specular,
+                    scenes,
                 ))
             }
         }
