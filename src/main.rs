@@ -7,8 +7,8 @@ fn raytracer_spheres_example() {
     const CANVAS_HEIGHT: usize = 600;
 
     let mut raytracer = Raytracer::new(
-        Point::origin(),
-        Viewport::default(),
+        Point(-0.0, 0.0, 0.0),
+        Viewport::new(Point(0.0, 0.0, 1.0), 1.0, 1.0),
         Canvas::new(CANVAS_WIDTH, CANVAS_HEIGHT),
     );
 
@@ -20,9 +20,9 @@ fn raytracer_spheres_example() {
     ];
 
     let lights = vec![
-        Light::Ambient(0.2),
-        Light::Point(0.6, Point(2.0, 1.0, 0.0)),
-        Light::Directional(0.2, Vector(1.0, 4.0, 4.0)),
+        Light::Ambient(0.1),
+        Light::Point(0.6, Point(3.0, 10.0, -2.0)),
+        Light::Directional(0.3, Vector(3.0, 0.0, -1.0)),
     ];
     raytracer.fill_canvas(shapes, &lights);
 

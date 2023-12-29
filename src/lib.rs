@@ -7,7 +7,8 @@ use shape::{Shape, Sphere};
 pub mod light;
 pub mod shape;
 
-const RECURSION_DEPTH: usize = 10;
+const RECURSION_DEPTH: usize = 3;
+const EPSILON: f64 = 0.001;
 
 type Direction = Vector;
 
@@ -227,6 +228,12 @@ impl Default for Viewport {
     }
 }
 
+impl Viewport {
+    pub fn new(center: Point, h: f64, w: f64) -> Self {
+        Self { center, h, w }
+    }
+}
+
 // n: normal surface, unit vector, perpendicular to surface at P
 // s: specular exponent, -1.0 for non specular
 fn compute_lighting(
@@ -253,7 +260,7 @@ fn compute_lighting(
                     unreachable!()
                 };
 
-                if closest_intersection(p, l, scenes, 0.0001, t_max).is_some() {
+                if closest_intersection(p, l, scenes, EPSILON, t_max).is_some() {
                     continue;
                 }
 
@@ -281,8 +288,8 @@ fn reflect_ray(n: Vector, ray: Vector) -> Vector {
     n.scale(2.0).scale(n.dot(ray)) - ray
 }
 
-pub fn closest_intersection<'a>(
-    start_point: Point,
+fn closest_intersection<'a>(
+    origin: Point,
     direction_vector: Direction,
     scenes: &'a [Sphere],
     t_min: f64,
@@ -292,7 +299,7 @@ pub fn closest_intersection<'a>(
     let mut closest_sphere: Option<&Sphere> = None;
 
     for shape in scenes {
-        if let Some((t1, t2)) = shape.intersect_ray(start_point, direction_vector) {
+        if let Some((t1, t2)) = shape.intersect_ray(origin, direction_vector) {
             if t_min <= t1 && t1 <= t_max && t1 < closest_t {
                 closest_t = t1;
                 closest_sphere = Some(shape);
@@ -341,7 +348,7 @@ fn trace_ray(
                 reflected_ray,
                 scenes,
                 lights,
-                0.0001,
+                EPSILON,
                 f64::MAX,
                 recursion_depth - 1,
             );
@@ -350,8 +357,8 @@ fn trace_ray(
     }
 }
 
-pub fn ray_at(start: Point, direction_vector: Direction, t: f64) -> Point {
-    Point::from(direction_vector.scale(t)) + start
+pub fn ray_at(origin: Point, direction_vector: Direction, t: f64) -> Point {
+    origin + Point::from(direction_vector.scale(t))
 }
 
 pub struct Raytracer {
@@ -373,13 +380,14 @@ impl Raytracer {
         for y in -(self.canvas.h as i32) / 2..(self.canvas.h as i32 / 2) {
             for x in -(self.canvas.w as i32) / 2..(self.canvas.w as i32 / 2) {
                 let vp_point = self.viewport_point_from_canvas_point(x as f64, y as f64);
+
                 let color = trace_ray(
                     self.camera,
                     (vp_point - self.camera).into(),
                     &scenes,
                     lights,
                     1.0,
-                    100.0,
+                    5000.0,
                     RECURSION_DEPTH,
                 );
                 self.canvas.put_pixel(x, y, color);
