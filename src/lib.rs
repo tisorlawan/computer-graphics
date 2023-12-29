@@ -7,6 +7,8 @@ use shape::{Shape, Sphere};
 pub mod light;
 pub mod shape;
 
+const RECURSION_DEPTH: usize = 10;
+
 type Direction = Vector;
 
 pub mod color {
@@ -21,13 +23,13 @@ pub mod color {
     pub const CYAN: Color = Color(0, 255, 255);
     pub const YELLOW: Color = Color(255, 255, 0);
 
-    pub const BG_COLOR: Color = WHITE;
+    pub const BG_COLOR: Color = BLACK;
 
     #[derive(Debug, Clone, Copy)]
     pub struct Color(pub u8, pub u8, pub u8);
 
     impl Color {
-        pub fn scale(&mut self, factor: f64) -> Color {
+        pub fn scale(&self, factor: f64) -> Color {
             let mut c = self.clone();
             let r = c.0 as f64 * factor as f64;
             let r: u8 = if r > 255.0 { 255 } else { r.floor() as u8 };
@@ -129,6 +131,12 @@ impl Point {
     }
 }
 
+impl From<Vector> for Point {
+    fn from(value: Vector) -> Self {
+        Point(value.0, value.1, value.2)
+    }
+}
+
 impl ops::Sub for Point {
     type Output = Self;
 
@@ -219,33 +227,6 @@ impl Default for Viewport {
     }
 }
 
-pub fn closest_intersection<'a>(
-    start_point: Point,
-    direction_vector: Direction,
-    scenes: &'a [Sphere],
-    t_min: f64,
-    t_max: f64,
-) -> Option<(f64, &'a Sphere)> {
-    let mut closest_t = f64::MAX - 1.0;
-    let mut closest_sphere: Option<&Sphere> = None;
-
-    for shape in scenes {
-        if let Some((t1, t2)) = shape.intersect_ray(start_point, direction_vector) {
-            if t_min <= t1 && t1 <= t_max && t1 < closest_t {
-                closest_t = t1;
-                closest_sphere = Some(shape);
-            }
-
-            if t_min <= t2 && t2 <= t_max && t2 < closest_t {
-                closest_t = t2;
-                closest_sphere = Some(shape);
-            }
-        }
-    }
-
-    closest_sphere.map(|e| (closest_t, e))
-}
-
 // n: normal surface, unit vector, perpendicular to surface at P
 // s: specular exponent, -1.0 for non specular
 fn compute_lighting(
@@ -284,7 +265,7 @@ fn compute_lighting(
 
                 // specular
                 if s != -1.0 {
-                    let r = n.scale(2.0).scale(n_dot_l) - l;
+                    let r = reflect_ray(n, l);
                     let r_cos_v = r.cos(v);
                     if r_cos_v > 0.0 {
                         i += intensity * r_cos_v.powf(s);
@@ -294,6 +275,83 @@ fn compute_lighting(
         }
     }
     i
+}
+
+fn reflect_ray(n: Vector, ray: Vector) -> Vector {
+    n.scale(2.0).scale(n.dot(ray)) - ray
+}
+
+pub fn closest_intersection<'a>(
+    start_point: Point,
+    direction_vector: Direction,
+    scenes: &'a [Sphere],
+    t_min: f64,
+    t_max: f64,
+) -> Option<(f64, &'a Sphere)> {
+    let mut closest_t = f64::MAX - 1.0;
+    let mut closest_sphere: Option<&Sphere> = None;
+
+    for shape in scenes {
+        if let Some((t1, t2)) = shape.intersect_ray(start_point, direction_vector) {
+            if t_min <= t1 && t1 <= t_max && t1 < closest_t {
+                closest_t = t1;
+                closest_sphere = Some(shape);
+            }
+
+            if t_min <= t2 && t2 <= t_max && t2 < closest_t {
+                closest_t = t2;
+                closest_sphere = Some(shape);
+            }
+        }
+    }
+
+    closest_sphere.map(|e| (closest_t, e))
+}
+
+fn trace_ray(
+    start: Point,                // usually camera
+    direction_vector: Direction, // usually w.r.t viewport_point
+    scenes: &[Sphere],
+    lights: &[Light],
+    t_min: f64,
+    t_max: f64,
+    recursion_depth: usize,
+) -> color::Color {
+    let intersection = closest_intersection(start, direction_vector.into(), scenes, t_min, t_max);
+
+    match intersection {
+        None => color::BG_COLOR,
+        Some((closest_t, sphere)) => {
+            let p = ray_at(start, direction_vector, closest_t);
+            let local_color = sphere.color().scale(compute_lighting(
+                p,
+                sphere.normal(p),
+                direction_vector.scale(-1.0).into(),
+                lights,
+                sphere.specular,
+                scenes,
+            ));
+            if recursion_depth == 0 || sphere.reflective <= 0.0 {
+                return local_color;
+            }
+
+            let reflected_ray = reflect_ray(sphere.normal(p), direction_vector.scale(-1.0).into());
+            let reflected_color = trace_ray(
+                p,
+                reflected_ray,
+                scenes,
+                lights,
+                0.0001,
+                f64::MAX,
+                recursion_depth - 1,
+            );
+            local_color.scale(1.0 - sphere.reflective) + reflected_color.scale(sphere.reflective)
+        }
+    }
+}
+
+pub fn ray_at(start: Point, direction_vector: Direction, t: f64) -> Point {
+    Point::from(direction_vector.scale(t)) + start
 }
 
 pub struct Raytracer {
@@ -315,36 +373,16 @@ impl Raytracer {
         for y in -(self.canvas.h as i32) / 2..(self.canvas.h as i32 / 2) {
             for x in -(self.canvas.w as i32) / 2..(self.canvas.w as i32 / 2) {
                 let vp_point = self.viewport_point_from_canvas_point(x as f64, y as f64);
-                let color = self.trace_ray(vp_point, &scenes, lights, 1.0, 100.0);
-                self.canvas.put_pixel(x, y, color);
-            }
-        }
-    }
-
-    pub fn trace_ray(
-        &self,
-        viewport_point: Point,
-        scenes: &[Sphere],
-        lights: &[Light],
-        t_min: f64,
-        t_max: f64,
-    ) -> color::Color {
-        let direction = viewport_point - self.camera;
-        let intersection =
-            closest_intersection(self.camera, direction.into(), scenes, t_min, t_max);
-
-        match intersection {
-            None => color::BG_COLOR,
-            Some((closest_t, sphere)) => {
-                let p = self.ray_at(viewport_point, closest_t);
-                sphere.color().scale(compute_lighting(
-                    p,
-                    sphere.normal(p),
-                    direction.scale(-1.0).into(),
+                let color = trace_ray(
+                    self.camera,
+                    (vp_point - self.camera).into(),
+                    &scenes,
                     lights,
-                    sphere.specular,
-                    scenes,
-                ))
+                    1.0,
+                    100.0,
+                    RECURSION_DEPTH,
+                );
+                self.canvas.put_pixel(x, y, color);
             }
         }
     }
@@ -355,11 +393,6 @@ impl Raytracer {
         let vz = self.vw.center.z();
 
         Point(vx, vy, vz)
-    }
-
-    pub fn ray_at(&self, viewport_point: Point, t: f64) -> Point {
-        let direction = viewport_point - self.camera;
-        direction.scale(t) + self.camera
     }
 
     pub fn save_canvas_to_ppm_file(&self, path: impl AsRef<Path>) -> io::Result<()> {

@@ -11,15 +11,17 @@ pub struct Sphere {
     r: f64,
     pub color: Color,
     pub specular: f64,
+    pub reflective: f64,
 }
 
 impl Sphere {
-    pub fn new(c: Point, r: f64, color: Color, specular: f64) -> Self {
+    pub fn new(c: Point, r: f64, color: Color, specular: f64, reflective: f64) -> Self {
         Self {
             c,
             r,
             color,
             specular,
+            reflective,
         }
     }
 
