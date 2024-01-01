@@ -1,7 +1,9 @@
-use computer_graphics::raytracer::{
-    color, light::Light, shape::Sphere, Canvas, Point, Raytracer, Vector, Viewport,
+use computer_graphics::{
+    raytracer::{self, color, light::Light, shape::Sphere, Point, Raytracer, Vector, Viewport},
+    razterization::{self, P2},
 };
 
+#[allow(dead_code)]
 fn raytracer_spheres_example() {
     const CANVAS_WIDTH: usize = 600;
     const CANVAS_HEIGHT: usize = 600;
@@ -9,7 +11,7 @@ fn raytracer_spheres_example() {
     let mut raytracer = Raytracer::new(
         Point(-0.0, 0.0, 0.0),
         Viewport::new(Point(0.0, 0.0, 1.0), 1.0, 1.0),
-        Canvas::new(CANVAS_WIDTH, CANVAS_HEIGHT),
+        raytracer::Canvas::new(CANVAS_WIDTH, CANVAS_HEIGHT),
     );
 
     let shapes = vec![
@@ -31,6 +33,16 @@ fn raytracer_spheres_example() {
         .expect("failed create ppm file");
 }
 
+fn razterization_example() {
+    let mut canvas = razterization::Canvas::new(800, 800);
+    canvas.draw_line(P2(-200, -100), P2(240, 120), razterization::YELLOW);
+    canvas.draw_line(P2(-50, -200), P2(60, 240), razterization::RED);
+    canvas
+        .save_to_ppm_file("razterization.ppm")
+        .expect("failed create ppm file");
+}
+
 fn main() {
-    raytracer_spheres_example();
+    // raytracer_spheres_example();
+    razterization_example();
 }
