@@ -1,4 +1,4 @@
-use crate::{Direction, Point};
+use crate::raytracer::{Direction, Point};
 
 type Intensity = f64;
 

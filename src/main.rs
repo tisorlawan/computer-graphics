@@ -1,4 +1,4 @@
-use computer_graphics::{
+use computer_graphics::raytracer::{
     color, light::Light, shape::Sphere, Canvas, Point, Raytracer, Vector, Viewport,
 };
 

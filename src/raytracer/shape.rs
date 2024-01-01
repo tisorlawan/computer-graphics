@@ -1,4 +1,4 @@
-use crate::{color::Color, Point, Vector};
+use crate::raytracer::{color::Color, Point, Vector};
 
 pub trait Shape {
     fn intersect_ray(&self, camera: Point, ray_direction: Vector) -> Option<(f64, f64)>;
