@@ -5,8 +5,8 @@ use computer_graphics::{
 
 #[allow(dead_code)]
 fn raytracer_spheres_example() {
-    const CANVAS_WIDTH: usize = 600;
-    const CANVAS_HEIGHT: usize = 600;
+    const CANVAS_WIDTH: usize = 1000;
+    const CANVAS_HEIGHT: usize = 1000;
 
     let mut raytracer = Raytracer::new(
         Point(-0.0, 0.0, 0.0),
@@ -35,14 +35,16 @@ fn raytracer_spheres_example() {
 
 fn razterization_example() {
     let mut canvas = razterization::Canvas::new(800, 800);
+
     canvas.draw_line(P2(-200, -100), P2(240, 120), razterization::YELLOW);
     canvas.draw_line(P2(-50, -200), P2(60, 240), razterization::RED);
+    canvas.draw_line(P2(0, 0), P2(300, 300), razterization::GREEN);
     canvas
         .save_to_ppm_file("razterization.ppm")
         .expect("failed create ppm file");
 }
 
 fn main() {
-    // raytracer_spheres_example();
+    raytracer_spheres_example();
     razterization_example();
 }
